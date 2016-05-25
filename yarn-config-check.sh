@@ -1,42 +1,17 @@
 #!/bin/bash
-#--------------------------------------------------------------------
-#  Script		: yarn-config-check.sh
-#  Syntax       : bash yarn-config-check.sh
-#  Developed by : Abhishek Choudhary
-#
-#  This is a helper script which validates yarn configuraion
-#  done through pmx/cli. This script performs 1st level of checks only
-#  and helps in debugging the system
-#  Checks Included in The Script
-#  1. Proper Key-Sharing check across cluster
-#  2. Missing IP - HOST mappings
-#  3. Hosts File check across cluster
-#  4. Cluster ID check across cluster
-#  5. Vaidation of pmx configured hadoop_yarn
-#  6. If HA is configured then configuration validation
-#     @ master and standby node both.
-#  7. Free Space on each node
-#  8. Info for more configurable options
-#
-#  Note : This script will run only if run on namenode
-#
-#----------------------------------------------------------------------
-
-clusterIDError=`mktemp`
+runningActiveConfigFile=`mktemp`
+runningStandByConfigFile=`mktemp`
 configurableSetings=`mktemp`
 configuredActiveSettings=`mktemp`
 configuredStandBySettings=`mktemp`
-freeSpaceError=`mktemp`
-hostsMismatch=`mktemp`
-ipHostMappingError=`mktemp`
 mapIpHost=`mktemp`
-remoteHostAccess=`mktemp`
-runningActiveConfigFile=`mktemp`
-runningStandByConfigFile=`mktemp`
+ipHostMappingError=`mktemp`
 selfHostAccess=`mktemp`
+remoteHostAccess=`mktemp`
+hostsMismatch=`mktemp`
+clusterIDError=`mktemp`
+freeSpaceError=`mktemp`
 validInput=`mktemp`
-multipleHosts=`mktemp`
-hostNameError=`mktemp`
 
 currHost=`hostname`
 export STOP_EXECUTION=0
@@ -44,27 +19,23 @@ validUsers="root admin"
 
 FREE_SPACE_UPPERLIMIT=98
 
-trap cleanUpFiles EXIT
-
 cleanUpFiles() {
-	rm -rf $clusterIDError
+	rm -rf $runningActiveConfigFile
 	rm -rf $configurableSetings
 	rm -rf $configuredActiveSettings
+	rm -rf $runningStandByConfigFile
 	rm -rf $configuredStandBySettings
-	rm -rf $freeSpaceError
 	rm -rf $ipHostMappingError
 	rm -rf $mapIpHost
-	rm -rf $remoteHostAccess
-	rm -rf $runningActiveConfigFile
-	rm -rf $runningStandByConfigFile
 	rm -rf $selfHostAccess
+	rm -rf $remoteHostAccess
+	rm -rf $clusterIDError
+	rm -rf $freeSpaceError
 	rm -rf $validInput
-	rm -rf $multipleHosts
-	rm -rf $hostNameError
 }
 
 isValidRun() {
-	setupType=$(grep  -E "/tps/process/(hadoop|hadoop_yarn) value" ${runningActiveConfigFile}| awk '{print $NF}')
+	setupType=`grep  -E "/tps/process/(hadoop|hadoop_yarn) value" ${runningActiveConfigFile}| awk '{print $NF}'`
 	case $setupType in
 		"hadoop" )
 			setup="HADOOP"
@@ -89,30 +60,30 @@ configDumpRemote () {
 }
 
 checkConfigHA() {
-	var=$(grep '^config_ha' ${configuredActiveSettings} | cut -d ':' -f2 | tr '[:upper:]' '[:lower:]')
+	var=`grep '^config_ha' ${configuredActiveSettings} | cut -d ':' -f2 | tr '[:upper:]' '[:lower:]'`
 	echo $var
 }
 
 checkNameNode1() {
-	var=$(grep '^namenode1' ${configuredActiveSettings} | cut -d ':' -f2)
+	var=`grep '^namenode1' ${configuredActiveSettings} | cut -d ':' -f2`
 	echo $var
 }
 
 checkNameNode2() {
-	var=$(grep '^namenode2' ${configuredActiveSettings} | cut -d ':' -f2)
+	var=`grep '^namenode2' ${configuredActiveSettings} | cut -d ':' -f2`
 	echo $var
 }
 
 checkNameService() {
-	var=$(grep '^nameservice' ${configuredActiveSettings} | cut -d ':' -f2)
+	var=`grep '^nameservice' ${configuredActiveSettings} | cut -d ':' -f2`
 	echo $var
 }
 
 getList() {
 	var=""
-	for val in $(grep "^$1" ${configuredActiveSettings})
+	for val in `grep "^$1" ${configuredActiveSettings}`
 	do
-		sAdd=$(echo "$val"| cut -d ':' -f2)
+		sAdd=`echo "$val"| cut -d ':' -f2`
 		var=$var" "$sAdd
 	done
 	echo "$var"
@@ -182,28 +153,6 @@ done
 EOF
 }
 
-checkMultipleHostName() {
-	for tHost in ${validNodes[@]}
-	do
-		tHostNames=$(ssh -q -l root $tHost "grep $tHost /etc/hosts 2>/dev/null | awk '{print \$NF}'")
-		echo $tHostNames | grep -q ','
-		if [[ $? -eq 0 ]];then
-			echo $tHost":"$tHostNames
-		fi
-	done>$multipleHosts
-}
-
-checkWrongHostname() {
-	for tHost in ${validNodes[@]}
-	do
-		currHostname=$(ssh -q -l root $tHost "hostname")
-		validedateHostName=$(ssh -q -l root $tHost "grep $tHost /etc/hosts 2>/dev/null | awk '{print \$NF}' | grep -- $currHostname ")
-		if [[ $validedateHostName = "" ]];then
-			echo $tHost":Wrong HostName Set -$currHostname"
-		fi
-	done>$hostNameError
-}
-
 checkClusterIdMisMatch ()
 {
 	for dn in ${slavesList[@]}
@@ -213,7 +162,7 @@ checkClusterIdMisMatch ()
 			echo "$currHost:$dn No Conf Found"
 		else
 			for dDir in "${dataDirs[@]}";do
-				diff <(cat /data/yarn/namenode/current/VERSION 2>/dev/null | grep clusterID | cut -d "=" -f2) <(ssh -q -l root $dn 'cat '$dDir'/current/VERSION  2>/dev/null | grep clusterID | cut -d "=" -f2') >/dev/null 2>&1
+				diff <(cat /data/yarn/namenode/current/VERSION  | grep clusterID | cut -d "=" -f2) <(ssh -q -l root $dn 'cat '$dDir'/current/VERSION  2>/dev/null | grep clusterID | cut -d "=" -f2') >/dev/null 2>&1
 				if [[ $? -ne 0 ]];then
 					echo "$currHost:$dn DataNode dir $dDir"
 				fi
@@ -224,7 +173,7 @@ checkClusterIdMisMatch ()
 
 	for jn in ${journalnodeList[@]}
 	do
-		diff <(cat /data/yarn/namenode/current/VERSION 2>/dev/null  | grep clusterID | cut -d "=" -f2) <(ssh -q -l root $jn 'cat /data/yarn/journalnode/*/current/VERSION 2>/dev/null | grep clusterID | cut -d "=" -f2') >/dev/null 2>&1
+		diff <(cat /data/yarn/namenode/current/VERSION  | grep clusterID | cut -d "=" -f2) <(ssh -q -l root $jn 'cat /data/yarn/journalnode/*/current/VERSION 2>/dev/null | grep clusterID | cut -d "=" -f2') >/dev/null 2>&1
 		if [[ $? -ne 0 ]];then
 			echo "$currHost:$jn JournalNode"
 		fi
@@ -232,7 +181,7 @@ checkClusterIdMisMatch ()
 
 	if [[ $standByNode != "" ]]
 	then
-		diff <(cat /data/yarn/namenode/current/VERSION 2>/dev/null   | grep clusterID | cut -d "=" -f2) <(ssh -q -l root $standByNode 'cat /data/yarn/namenode/current/VERSION 2>/dev/null | grep clusterID | cut -d "=" -f2') >/dev/null 2>&1
+		diff <(cat /data/yarn/namenode/current/VERSION  | grep clusterID | cut -d "=" -f2) <(ssh -q -l root $standByNode 'cat /data/yarn/namenode/current/VERSION 2>/dev/null | grep clusterID | cut -d "=" -f2') >/dev/null 2>&1
 		if [[ $? -ne 0 ]];then
 			echo "$currHost:$standByNode NameNode"
 		fi
@@ -491,8 +440,8 @@ randerCompareTable() {
 			configured++; \
 			configurable++; \
 		} \
-		else if (NF==2 && $1==">") { \
-			split($2,temp,":"); \
+			else if (NF==2 && $1==">") { \
+					split($2,temp,":"); \
 			configurableProperty[configurable]=temp[1]; \
 			configurableValue[configurable]=temp[2]; \
 
@@ -506,8 +455,8 @@ randerCompareTable() {
 
 			configurable++; \
 
-		} \
-		else if (NF==2 && $2 == "<") { \
+			} \
+			else if (NF==2 && $2 == "<") { \
 			split($1,temp,":"); \
 			configuredProperty[configured]=temp[1]; \
 			configuredValue[configured]=temp[2]; \
@@ -519,28 +468,28 @@ randerCompareTable() {
 			valueMaxLength=a>b?a:b;     \
 			configured++; \
 		} \
-		else  if(NF==2) { \
-			split($1,temp,":"); \
-			configuredProperty[configured]=temp[1]; \
-			configuredValue[configured]=temp[2]; \
+				else  if(NF==2) { \
+						split($1,temp,":"); \
+						configuredProperty[configured]=temp[1]; \
+						configuredValue[configured]=temp[2]; \
 
-			split($2,temp,":"); \
-			configurableProperty[configurable]=temp[1]; \
-			configurableValue[configurable]=temp[2]; \
+						split($2,temp,":"); \
+						configurableProperty[configurable]=temp[1]; \
+						configurableValue[configurable]=temp[2]; \
 
-			a=propMaxLength; \
-			b=length(configuredProperty[configured]); \
-			c=length(configurableProperty[configurable]); \
-			propMaxLength=a>b?(a>c?a:c):(b>c?b:c); \
+						a=propMaxLength; \
+						b=length(configuredProperty[configured]); \
+						c=length(configurableProperty[configurable]); \
+						propMaxLength=a>b?(a>c?a:c):(b>c?b:c); \
 
-			a=valueMaxLength; \
-			b=length(configuredValue[configured]); \
-			c=length(configurableValue[configurable]); \
-			valueMaxLength=a>b?(a>c?a:c):(b>c?b:c); \
+						a=valueMaxLength; \
+						b=length(configuredValue[configured]); \
+						c=length(configurableValue[configurable]); \
+						valueMaxLength=a>b?(a>c?a:c):(b>c?b:c); \
 
-			configured++; \
-			configurable++; \
-		} \
+						configured++; \
+						configurable++; \
+				} \
 	} \
 	END { \
 		if (configured>0 ||configurable) { \
@@ -626,21 +575,10 @@ fi
 ( checkClusterIdMisMatch >$clusterIDError) &
 ( checkFreeSpace )&
 ( checkValidInput > $validInput )&
-( checkWrongHostname )&
-( checkMultipleHostName )&
 wait
 
 if [[ -s $hostsMismatch ]];then
 	randerKeyValue $hostsMismatch "ERROR : Ip Host Mapping" "Test" "Error"
-fi
-
-if [[ -s $hostNameError ]];then
-	randerKeyValue $hostNameError "Error : HOSTNAME not as per Yarn" "IP" "CurrentHostName"
-fi
-
-
-if [[ -s $multipleHosts ]];then
-	randerKeyValue $multipleHosts "Error : Multiple HostNames" "IP" "CurrentHostNames"
 fi
 
 grep -q 'Denied' $selfHostAccess $remoteHostAccess
@@ -677,3 +615,4 @@ fi
 
 randerCompareTable $configuredActiveSettings $configurableSetings "INFO : YARN Cluster Configurtaion" "Configured Properties" "Configurable (Optional)"
 cleanUpFiles
+
