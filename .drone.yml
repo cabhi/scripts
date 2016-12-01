@@ -6,6 +6,8 @@ pipeline:
     username: cabhi
     password: Xampp_11
     email: abhishek.ch.3@gmail.com
-    file: Dockerfile
+    file: Dockerfile 
+    environment:
+      - DOCKER_LAUNCH_DEBUG=true
     tags:
       - 1.1
