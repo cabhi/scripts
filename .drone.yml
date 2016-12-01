@@ -1,4 +1,8 @@
 pipeline:
+  build:
+     image: docker
+     script:
+       - docker build .  
   docker:
     image: drone-docker
     registry: https://gitlab.com
