@@ -1,12 +1,12 @@
 pipeline:
   docker:
-    image: plugins/docker
+    #image: plugins/docker
     registry: https://gitlab.com
     repo: registry.gitlab.com/cabhi/drone-test1
     username: cabhi
     password: Xampp_11
     email: abhishek.ch.3@gmail.com
-    file: Dockerfile 
+    file: drone-test1/Dockerfile 
     environment:
       - DOCKER_LAUNCH_DEBUG=true
     tags:
