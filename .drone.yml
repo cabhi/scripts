@@ -1,6 +1,6 @@
 pipeline:
   docker:
-    #image: plugins/docker
+    image: drone-docker
     registry: https://gitlab.com
     repo: registry.gitlab.com/cabhi/drone-test1
     username: cabhi
