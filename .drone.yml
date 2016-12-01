@@ -1,5 +1,4 @@
-abc:
-sdasfasfasdfasdfasdfsdafdsf
+abc: asdasd
 pipeline:
   build:
      image: docker
