@@ -6,5 +6,6 @@ pipeline:
     username: cabhi
     password: Xampp_11
     email: abhishek.ch.3@gmail.com
+    file: Dockerfile
     tags:
       - 1.1
