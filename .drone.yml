@@ -1,18 +1,51 @@
-abc: asdasd
+workspace:
+  base: /go
+  path: src/github.com/drone/drone
+
 pipeline:
-  build:
-     image: docker
-     script:
-       - docker build .  
-  docker:
-    image: drone-docker
-    registry: https://gitlab.com
-    repo: registry.gitlab.com/cabhi/drone-test1
-    username: cabhi
-    password: Xampp_11
-    email: abhishek.ch.3@gmail.com
-    file: drone-test1/Dockerfile 
+  test:
+    image: golang:1.6
     environment:
-      - DOCKER_LAUNCH_DEBUG=true
-    tags:
-      - 1.1
+      - GO15VENDOREXPERIMENT=1
+    commands:
+      - make deps gen
+      - make test test_postgres test_mysql
+
+  compile:
+    image: golang:1.6
+    environment:
+      - GO15VENDOREXPERIMENT=1
+      - GOPATH=/go
+    commands:
+      - export PATH=$PATH:$GOPATH/bin
+      - make build
+    when:
+      event: push
+
+  publish:
+    image: plugins/s3
+    acl: public-read
+    bucket: downloads.drone.io
+    source: release/**/*.*
+    when:
+      event: push
+      branch: master
+
+  docker:
+    image: plugins/docker
+    repo: drone/drone
+    tag: [ "0.5", "0.5.0", "0.5.0-rc" ]
+    when:
+      branch: master
+      event: push
+
+services:
+  postgres:
+    image: postgres:9.4.5
+    environment:
+      - POSTGRES_USER=postgres
+  mysql:
+    image: mysql:5.6.27
+    environment:
+      - MYSQL_DATABASE=test
+      - MYSQL_ALLOW_EMPTY_PASSWORD=yes
